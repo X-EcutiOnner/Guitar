@@ -118,6 +118,19 @@ jobs:
     - name: Setup MSVC
       uses: microsoft/setup-msbuild@v2
       
+    - name: Setup Visual Studio environment
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+        
+    - name: Verify environment
+      run: |
+        Write-Host "Checking environment variables..."
+        Write-Host "VCINSTALLDIR: $env:VCINSTALLDIR"
+        Write-Host "PATH includes nmake: $((Get-Command nmake -ErrorAction SilentlyContinue) -ne $null)"
+        Write-Host "PATH includes qmake: $((Get-Command qmake -ErrorAction SilentlyContinue) -ne $null)"
+      shell: pwsh
+      
     - name: Setup Ruby
       uses: ruby/setup-ruby@v1
       with:
@@ -129,27 +142,27 @@ jobs:
       
     - name: Build libfiletype
       run: |
-        Remove-Item -Recurse -Force _build_libfiletype -ErrorAction SilentlyContinue
-        New-Item -ItemType Directory -Path _build_libfiletype
-        Set-Location _build_libfiletype
+        if (Test-Path "_build_libfiletype") { Remove-Item -Recurse -Force "_build_libfiletype" }
+        New-Item -ItemType Directory -Path "_build_libfiletype"
+        Set-Location "_build_libfiletype"
         qmake "CONFIG+=release" ../filetype/libfiletype.pro
         nmake
-        Set-Location ..
+        Set-Location ".."
       shell: pwsh
       
     - name: Build Guitar
       run: |
-        Remove-Item -Recurse -Force _build_guitar -ErrorAction SilentlyContinue
-        New-Item -ItemType Directory -Path _build_guitar
-        Set-Location _build_guitar
+        if (Test-Path "_build_guitar") { Remove-Item -Recurse -Force "_build_guitar" }
+        New-Item -ItemType Directory -Path "_build_guitar"
+        Set-Location "_build_guitar"
         qmake "CONFIG+=release" ../Guitar.pro
         nmake
-        Set-Location ..
+        Set-Location ".."
       shell: pwsh
       
     - name: Test build
       run: |
-        Get-ChildItem _bin/
+        Get-ChildItem "_bin/"
         if (Test-Path "_bin/Guitar.exe") {
           Write-Host "Guitar.exe found"
         } else {
