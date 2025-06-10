@@ -65,8 +65,9 @@ jobs:
             binary_path: _bin/Guitar
             
           - os: windows-latest
-            name: windows-x64
-            artifact_name: guitar-windows-x64
+            name: windows-mingw-x64
+            artifact_name: guitar-windows-mingw-x64
+            enabled: false  # Temporarily disabled
             build_script: |
               ruby prepare.rb
               if exist "_build_libfiletype" rmdir /s /q "_build_libfiletype"
@@ -82,8 +83,28 @@ jobs:
               mingw32-make
               cd ..
             binary_path: _bin/Guitar.exe
+            
+          - os: windows-latest
+            name: windows-msvc2022-x64
+            artifact_name: guitar-windows-msvc2022-x64
+            build_script: |
+              ruby prepare.rb
+              if exist "_build_libfiletype" rmdir /s /q "_build_libfiletype"
+              mkdir "_build_libfiletype"
+              cd "_build_libfiletype"
+              qmake "CONFIG+=release" ../filetype/libfiletype.pro
+              nmake
+              cd ..
+              if exist "_build_guitar" rmdir /s /q "_build_guitar"
+              mkdir "_build_guitar"  
+              cd "_build_guitar"
+              qmake "CONFIG+=release" ../Guitar.pro
+              nmake
+              cd ..
+            binary_path: _bin/Guitar.exe
     
     runs-on: ${{ matrix.os }}
+    if: ${{ matrix.enabled != false }}
     
     steps:
     - name: Checkout code
@@ -91,8 +112,8 @@ jobs:
       with:
         fetch-depth: 0
         
-    - name: Setup Qt6 (Windows)
-      if: matrix.os == 'windows-latest'
+    - name: Setup Qt6 (Windows MinGW)
+      if: matrix.os == 'windows-latest' && contains(matrix.name, 'mingw')
       uses: jurplel/install-qt-action@v4
       with:
         version: '6.7.0'
@@ -101,11 +122,31 @@ jobs:
         arch: 'win64_mingw'
         
     - name: Setup MinGW (Windows)
-      if: matrix.os == 'windows-latest'
+      if: matrix.os == 'windows-latest' && contains(matrix.name, 'mingw')
       run: |
         choco install mingw -y
         refreshenv
       shell: cmd
+        
+    - name: Setup Qt6 (Windows MSVC)
+      if: matrix.os == 'windows-latest' && contains(matrix.name, 'msvc')
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.7.0'
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2019_64'
+        
+    - name: Setup MSVC 2022 (Windows)
+      if: matrix.os == 'windows-latest' && contains(matrix.name, 'msvc')
+      uses: microsoft/setup-msbuild@v2
+      
+    - name: Setup Visual Studio 2022 environment (Windows)
+      if: matrix.os == 'windows-latest' && contains(matrix.name, 'msvc')
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+        vsversion: 2022
       
     - name: Setup Ruby (Windows)
       if: matrix.os == 'windows-latest'
