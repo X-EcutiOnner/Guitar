@@ -69,18 +69,18 @@ jobs:
             artifact_name: guitar-windows-x64
             build_script: |
               ruby prepare.rb
-              if (Test-Path "_build_libfiletype") { Remove-Item -Recurse -Force "_build_libfiletype" }
-              New-Item -ItemType Directory -Path "_build_libfiletype"
-              Set-Location "_build_libfiletype"
+              if exist "_build_libfiletype" rmdir /s /q "_build_libfiletype"
+              mkdir "_build_libfiletype"
+              cd "_build_libfiletype"
               qmake "CONFIG+=release" ../filetype/libfiletype.pro
               nmake
-              Set-Location ".."
-              if (Test-Path "_build_guitar") { Remove-Item -Recurse -Force "_build_guitar" }
-              New-Item -ItemType Directory -Path "_build_guitar"  
-              Set-Location "_build_guitar"
+              cd ..
+              if exist "_build_guitar" rmdir /s /q "_build_guitar"
+              mkdir "_build_guitar"  
+              cd "_build_guitar"
               qmake "CONFIG+=release" ../Guitar.pro
               nmake
-              Set-Location ".."
+              cd ..
             binary_path: _bin/Guitar.exe
     
     runs-on: ${{ matrix.os }}
@@ -113,11 +113,11 @@ jobs:
     - name: Verify environment (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        Write-Host "Checking environment variables..."
-        Write-Host "VCINSTALLDIR: $env:VCINSTALLDIR"
-        Write-Host "PATH includes nmake: $((Get-Command nmake -ErrorAction SilentlyContinue) -ne $null)"
-        Write-Host "PATH includes qmake: $((Get-Command qmake -ErrorAction SilentlyContinue) -ne $null)"
-      shell: pwsh
+        echo Checking environment variables...
+        echo VCINSTALLDIR: %VCINSTALLDIR%
+        where nmake
+        where qmake
+      shell: cmd
       
     - name: Setup Ruby (Windows)
       if: matrix.os == 'windows-latest'
@@ -127,7 +127,7 @@ jobs:
         
     - name: Build
       run: ${{ matrix.build_script }}
-      shell: ${{ matrix.os == 'windows-latest' && 'pwsh' || 'bash' }}
+      shell: ${{ matrix.os == 'windows-latest' && 'cmd' || 'bash' }}
       
     - name: Verify build
       run: |
