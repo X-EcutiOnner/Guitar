@@ -1,0 +1,164 @@
+name: Release
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-amd64
+            artifact_name: guitar-linux-amd64
+            build_script: |
+              sudo apt-get update
+              sudo apt-get install -y \
+                build-essential \
+                ruby \
+                qmake6 \
+                libqt6core6 \
+                libqt6gui6 \
+                libqt6svg6-dev \
+                libqt6core5compat6-dev \
+                zlib1g-dev \
+                libgl1-mesa-dev \
+                libssl-dev \
+                qt6-base-dev \
+                qt6-svg-dev
+              ruby prepare.rb
+              rm -fr _build_libfiletype
+              mkdir _build_libfiletype
+              cd _build_libfiletype
+              qmake6 "CONFIG+=release" ../filetype/libfiletype.pro
+              make -j$(nproc)
+              cd ..
+              rm -fr _build_guitar
+              mkdir _build_guitar
+              cd _build_guitar
+              qmake6 "CONFIG+=release" ../Guitar.pro
+              make -j$(nproc)
+              cd ..
+            binary_path: _bin/Guitar
+            
+          - os: macos-latest
+            name: macos
+            artifact_name: guitar-macos
+            build_script: |
+              brew install qt@6 ruby
+              echo "/opt/homebrew/opt/qt@6/bin" >> $GITHUB_PATH
+              ruby prepare.rb
+              rm -fr _build_libfiletype
+              mkdir _build_libfiletype
+              cd _build_libfiletype
+              qmake "CONFIG+=release" ../filetype/libfiletype.pro
+              make -j$(sysctl -n hw.ncpu)
+              cd ..
+              rm -fr _build_guitar
+              mkdir _build_guitar
+              cd _build_guitar
+              qmake "CONFIG+=release" ../Guitar.pro
+              make -j$(sysctl -n hw.ncpu)
+              cd ..
+            binary_path: _bin/Guitar
+            
+          - os: windows-latest
+            name: windows-x64
+            artifact_name: guitar-windows-x64
+            build_script: |
+              ruby prepare.rb
+              Remove-Item -Recurse -Force _build_libfiletype -ErrorAction SilentlyContinue
+              New-Item -ItemType Directory -Path _build_libfiletype
+              Set-Location _build_libfiletype
+              qmake "CONFIG+=release" ../filetype/libfiletype.pro
+              nmake
+              Set-Location ..
+              Remove-Item -Recurse -Force _build_guitar -ErrorAction SilentlyContinue
+              New-Item -ItemType Directory -Path _build_guitar
+              Set-Location _build_guitar
+              qmake "CONFIG+=release" ../Guitar.pro
+              nmake
+              Set-Location ..
+            binary_path: _bin/Guitar.exe
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Setup Qt6 (Windows)
+      if: matrix.os == 'windows-latest'
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.7.0'
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2019_64'
+        
+    - name: Setup MSVC (Windows)
+      if: matrix.os == 'windows-latest'
+      uses: microsoft/setup-msbuild@v2
+      
+    - name: Setup Ruby (Windows)
+      if: matrix.os == 'windows-latest'
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.1'
+        
+    - name: Build
+      run: ${{ matrix.build_script }}
+      shell: ${{ matrix.os == 'windows-latest' && 'pwsh' || 'bash' }}
+      
+    - name: Verify build
+      run: |
+        if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          ls -la _bin/
+          file ${{ matrix.binary_path }} || echo "File command not available on Windows"
+        else
+          ls -la _bin/
+          file ${{ matrix.binary_path }}
+        fi
+      shell: bash
+      
+    - name: Create archive (Linux/macOS)
+      if: matrix.os != 'windows-latest'
+      run: |
+        mkdir -p release
+        cp ${{ matrix.binary_path }} release/
+        cd release
+        tar -czf ../guitar-${{ matrix.name }}.tar.gz *
+        
+    - name: Create archive (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        New-Item -ItemType Directory -Path release -Force
+        Copy-Item ${{ matrix.binary_path }} release/
+        Compress-Archive -Path release/* -DestinationPath guitar-${{ matrix.name }}.zip
+      shell: pwsh
+      
+    - name: Upload release artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: |
+          guitar-${{ matrix.name }}.tar.gz
+          guitar-${{ matrix.name }}.zip
+        if-no-files-found: ignore
+        
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          guitar-${{ matrix.name }}.tar.gz
+          guitar-${{ matrix.name }}.zip
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
