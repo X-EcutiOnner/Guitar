@@ -113,22 +113,12 @@ jobs:
         version: '6.7.0'
         host: 'windows'
         target: 'desktop'
-        arch: 'win64_msvc2019_64'
+        arch: 'win64_mingw'
         
-    - name: Setup MSVC
-      uses: microsoft/setup-msbuild@v2
-      
-    - name: Setup Visual Studio environment
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: x64
-        
-    - name: Verify environment
+    - name: Setup MinGW
       run: |
-        echo Checking environment variables...
-        echo VCINSTALLDIR: %VCINSTALLDIR%
-        where nmake
-        where qmake
+        choco install mingw -y
+        refreshenv
       shell: cmd
       
     - name: Setup Ruby
@@ -146,7 +136,7 @@ jobs:
         mkdir "_build_libfiletype"
         cd "_build_libfiletype"
         qmake "CONFIG+=release" ../filetype/libfiletype.pro
-        nmake
+        mingw32-make
         cd ..
       shell: cmd
       
@@ -156,7 +146,7 @@ jobs:
         mkdir "_build_guitar"
         cd "_build_guitar"
         qmake "CONFIG+=release" ../Guitar.pro
-        nmake
+        mingw32-make
         cd ..
       shell: cmd
       

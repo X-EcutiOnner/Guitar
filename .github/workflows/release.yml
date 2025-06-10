@@ -73,13 +73,13 @@ jobs:
               mkdir "_build_libfiletype"
               cd "_build_libfiletype"
               qmake "CONFIG+=release" ../filetype/libfiletype.pro
-              nmake
+              mingw32-make
               cd ..
               if exist "_build_guitar" rmdir /s /q "_build_guitar"
               mkdir "_build_guitar"  
               cd "_build_guitar"
               qmake "CONFIG+=release" ../Guitar.pro
-              nmake
+              mingw32-make
               cd ..
             binary_path: _bin/Guitar.exe
     
@@ -98,25 +98,13 @@ jobs:
         version: '6.7.0'
         host: 'windows'
         target: 'desktop'
-        arch: 'win64_msvc2019_64'
+        arch: 'win64_mingw'
         
-    - name: Setup MSVC (Windows)
-      if: matrix.os == 'windows-latest'
-      uses: microsoft/setup-msbuild@v2
-      
-    - name: Setup Visual Studio environment (Windows)
-      if: matrix.os == 'windows-latest'
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: x64
-        
-    - name: Verify environment (Windows)
+    - name: Setup MinGW (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        echo Checking environment variables...
-        echo VCINSTALLDIR: %VCINSTALLDIR%
-        where nmake
-        where qmake
+        choco install mingw -y
+        refreshenv
       shell: cmd
       
     - name: Setup Ruby (Windows)
